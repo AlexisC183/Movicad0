@@ -1,17 +1,17 @@
+from argon2 import PasswordHasher
+from argon2.exceptions import VerifyMismatchError
 from app import app
+from db import dbconn
+from datetime import datetime, timezone, timedelta
 from fastapi import Response
 from pydantic import BaseModel
 from functools import partial
+from models import User, Student, Administrative
 from utils import constants
 from utils.validation import assertion_fail
-from utils.res_bodies import err
+from utils.res_bodies import err, log_err
 import re
 
-
-# @app.get('/')
-# def home():
-#     return { 'message': 'Hello, World!' }
-# https://pytutorial.com/fastapi-tutorial-build-your-first-python-rest-api/
 
 class CreateReq(BaseModel):
     id: str
@@ -45,5 +45,30 @@ def create(req: CreateReq, res: Response):
         res.status_code = 400
         return body
 
-    return { 'message': 'Everything seems fine' }
-        
+    user = User(
+        0,
+        req.id.lower(),
+        req.role,
+        PasswordHasher().hash(req.password),
+        datetime.now(timezone(timedelta())),
+        False
+    )
+    conn = None
+
+    try:
+        conn = dbconn()
+        with conn.cursor() as c:
+            c.execute('select exists (select 1 from users where key = %s)', [user.key])
+            if c.fetchone()[0]:
+                res.status_code = 500
+                return err('Intentar un identificador único diferente')
+            
+            c.execute('insert into users values (default, %s, %s, %s, %s, %s) returning users.id', [user.key, user.role, user.password, user.creation, user.deleted])
+            [auto_id] = c.fetchone()
+            # TODO: Student | Administrative
+    except Exception as e:
+        res.status_code = 500
+        return log_err(e)
+    finally:
+        if conn is not None:
+            conn.close()
