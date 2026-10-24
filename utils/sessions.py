@@ -5,9 +5,10 @@ from datetime import datetime, timezone, timedelta
 from models import Session
 from utils.res_bodies import err
 from db import dbconn
-from utils import constants
 import secrets
 import hashlib
+
+SESSION_AGE_SECONDS = 24 * 60 * 60
 
 def _gen_session_token():
     return secrets.token_urlsafe(32)
@@ -28,16 +29,28 @@ def create_session(conn, user_id: int):
         _hash_session_token(token),
         user_id,
         now,
-        now + timedelta(seconds=constants.SESSION_AGE_SECONDS)
+        now + timedelta(seconds=constants.SESSION_AGE_SECONDS),
+        False
     )
 
     with conn.cursor() as c:
         c.execute(
-            'insert into sessions values (default, %s, %s, %s, %s)',
-            [session.token_hash, session.user_id, session.creation, session.expiration]
+            'insert into sessions values (default, %s, %s, %s, %s, %s)',
+            [session.token_hash, session.user_id, session.creation, session.expiration, session.deleted]
         )
     
     return token
+
+def delete_session(conn, token: str):
+    """
+    Sets the session with `token` as deleted in the database.
+    The transaction is not committed.
+    """
+    with conn.cursor() as c:
+        c.execute(
+            'update sessions set deleted = true where token_hash = %s',
+            [_hash_session_token(token)]
+        )
 
 def set_auth_cookie(res: Response, token: str):
     """Sets a session cookie."""
@@ -48,6 +61,16 @@ def set_auth_cookie(res: Response, token: str):
         #secure=True
         samesite='lax',
         max_age=constants.SESSION_AGE_SECONDS,
+        path='/'
+    )
+
+def delete_auth_cookie(res: Response):
+    """Deletes the session cookie."""
+    res.delete_cookie(
+        key='session',
+        httponly=True,
+        #secure=True,
+        samesite='lax',
         path='/'
     )
 
@@ -72,7 +95,7 @@ def verify_requester(req: Request, *allowed_roles: str):
         conn = dbconn()
         with conn.cursor() as c:
             c.execute(
-                'select u.id, u.role from sessions s join users u on u.id = s.user_id where s.token_hash = %s and s.expiration > now() and u.deleted = false',
+                'select u.id, u.role from sessions s join users u on u.id = s.user_id where s.token_hash = %s and s.expiration > now() and not u.deleted and not s.deleted',
                 [_hash_session_token(token)]
             )
             user = c.fetchone()

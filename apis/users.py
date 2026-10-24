@@ -12,7 +12,6 @@ from utils.validation import assertion_fail
 from utils.res_bodies import err, log_err, ok
 import re
 
-
 class CreateData(BaseModel):
     id: str
     password: str
@@ -112,3 +111,4 @@ def create(res: Response, data: CreateData):
     finally:
         if conn is not None:
             conn.close()
+            

@@ -19,6 +19,7 @@ class Session:
     user_id: int
     creation: datetime
     expiration: datetime
+    deleted: bool
 
 
 @dataclass

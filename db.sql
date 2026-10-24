@@ -22,7 +22,8 @@ create table sessions (
         unique,
     user_id bigint not null references users(id),
     creation timestamptz not null,
-    expiration timestamptz not null
+    expiration timestamptz not null,
+    deleted boolean not null
 );
 
 create table students (
