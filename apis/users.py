@@ -27,7 +27,7 @@ def create(res: Response, data: CreateData):
 
     if body := assertion_fail(data, {
         'id': (
-            lambda id: 1 <= len(id) <= 50 and bool(re.match('\\w+', id, re.ASCII)),
+            lambda id: 1 <= len(id) <= 50 and bool(re.fullmatch('\\w+', id, re.ASCII)),
             partial(err, 'El identificador debe tener longitud [1, 50] y solo permite los caracteres [a-zA-Z0-9_]')
         ),
         'password': (

@@ -3,7 +3,7 @@
 from fastapi import Request, Response
 from datetime import datetime, timezone, timedelta
 from models import Session
-from res_bodies import err
+from utils.res_bodies import err
 from db import dbconn
 from utils import constants
 import secrets
