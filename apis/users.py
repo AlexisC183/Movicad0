@@ -2,7 +2,7 @@ from argon2 import PasswordHasher
 from argon2.exceptions import VerifyMismatchError
 from app import app
 from db import dbconn
-from datetime import datetime, timezone, timedelta
+from datetime import datetime, timezone
 from fastapi import Response
 from pydantic import BaseModel
 from functools import partial
@@ -13,19 +13,19 @@ from utils.res_bodies import err, log_err, ok
 import re
 
 
-class CreateReq(BaseModel):
+class CreateData(BaseModel):
     id: str
     password: str
     password1: str
     role: str
 
 @app.post('/api/users/create')
-def create(req: CreateReq, res: Response):
-    if req.password != req.password1:
+def create(res: Response, data: CreateData):
+    if data.password != data.password1:
         res.status_code = 400
         return err('Las contraseñas no coinciden')
 
-    if body := assertion_fail(req, {
+    if body := assertion_fail(data, {
         'id': (
             lambda id: 1 <= len(id) <= 50 and bool(re.match('\\w+', id, re.ASCII)),
             partial(err, 'El identificador debe tener longitud [1, 50] y solo permite los caracteres [a-zA-Z0-9_]')
@@ -48,10 +48,10 @@ def create(req: CreateReq, res: Response):
 
     user = User(
         0,
-        req.id.lower(),
-        req.role,
-        PasswordHasher().hash(req.password),
-        datetime.now(timezone(timedelta())),
+        data.id.lower(),
+        data.role,
+        PasswordHasher().hash(data.password),
+        datetime.now(timezone.utc),
         False
     )
     conn = None
@@ -71,7 +71,7 @@ def create(req: CreateReq, res: Response):
             )
             [auto_id] = c.fetchone()
 
-            if req.role == constants.STUDENT:
+            if data.role == constants.STUDENT:
                 student = Student(
                     auto_id,
                     '',
@@ -80,10 +80,10 @@ def create(req: CreateReq, res: Response):
                 )
                 c.execute(
                     'insert into students values (%s, %s, %s, %s)',
-                    [student.auto_id, student.name, student.icon, student.icon_media_type]
+                    [student.id, student.name, student.icon, student.icon_media_type]
                 )
 
-            if req.role == constants.ADMINISTRATIVE:
+            if data.role == constants.ADMINISTRATIVE:
                 admin = Administrative(
                     auto_id,
                     '',

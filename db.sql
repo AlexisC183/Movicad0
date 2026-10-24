@@ -16,6 +16,15 @@ create table users (
     deleted boolean not null
 );
 
+create table sessions (
+    id bigserial primary key,
+    token_hash text not null
+        unique,
+    user_id bigint not null references users(id),
+    creation timestamptz not null,
+    expiration timestamptz not null
+);
+
 create table students (
     id bigint not null
         references users(id),

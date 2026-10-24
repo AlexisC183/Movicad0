@@ -13,6 +13,15 @@ class User:
 
 
 @dataclass
+class Session:
+    id: int
+    token_hash: str
+    user_id: int
+    creation: datetime
+    expiration: datetime
+
+
+@dataclass
 class Student:
     id: int
     name: str
