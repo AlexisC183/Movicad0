@@ -5,6 +5,7 @@ from datetime import datetime, timezone, timedelta
 from models import Session
 from res_bodies import err
 from db import dbconn
+from utils import constants
 import secrets
 import hashlib
 
@@ -15,16 +16,19 @@ def _hash_session_token(token: str):
     return hashlib.sha256(token.encode()).hexdigest()
 
 def create_session(conn, user_id: int):
-    """Inserts a session in the database. The transaction is not committed."""
+    """
+    Inserts a session in the database.
+    The transaction is not committed.
+    Returns a new session token.
+    """
     token = _gen_session_token()
     now = datetime.now(timezone.utc)
-    expiration = now + timedelta(days=1)
     session = Session(
         0,
         _hash_session_token(token),
         user_id,
         now,
-        expiration
+        now + timedelta(seconds=constants.SESSION_AGE_SECONDS)
     )
 
     with conn.cursor() as c:
@@ -33,7 +37,7 @@ def create_session(conn, user_id: int):
             [session.token_hash, session.user_id, session.creation, session.expiration]
         )
     
-    return token, expiration
+    return token
 
 def set_auth_cookie(res: Response, token: str):
     """Sets a session cookie."""
@@ -43,7 +47,7 @@ def set_auth_cookie(res: Response, token: str):
         httponly=True,
         #secure=True
         samesite='lax',
-        max_age=24 * 60 * 60,
+        max_age=constants.SESSION_AGE_SECONDS,
         path='/'
     )
 
@@ -51,7 +55,7 @@ def verify_requester(req: Request, *allowed_roles: str):
     """
     Verifies the authentication token from the session cookie and then from the database.
     If the session exists, verifies that the requester's role is in `allowed_roles`.
-    Returns `{ 'fail': False, 'idRolePair': { 'id': int, 'role': str } }` or `{ 'fail': True, 'sc': int, 'body': dict }`
+    Returns `{ 'fail': False, 'idRolePair': { 'id': int, 'role': str } }` or `{ 'fail': True, 'sc': int, 'body': dict }`.
     """
     token = req.cookies.get('session')
 

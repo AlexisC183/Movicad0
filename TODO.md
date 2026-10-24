@@ -1,1 +1,3 @@
-Todo, review and test many things...
+# TEST
+'/api/users/create'
+'/api/sessions/verify-session'

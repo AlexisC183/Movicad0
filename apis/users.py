@@ -1,5 +1,4 @@
 from argon2 import PasswordHasher
-from argon2.exceptions import VerifyMismatchError
 from app import app
 from db import dbconn
 from datetime import datetime, timezone
@@ -8,6 +7,7 @@ from pydantic import BaseModel
 from functools import partial
 from models import User, Student, Administrative
 from utils import constants
+from utils import sessions
 from utils.validation import assertion_fail
 from utils.res_bodies import err, log_err, ok
 import re
@@ -69,11 +69,11 @@ def create(res: Response, data: CreateData):
                 'insert into users values (default, %s, %s, %s, %s, %s) returning users.id',
                 [user.key, user.role, user.password, user.creation, user.deleted]
             )
-            [auto_id] = c.fetchone()
+            user.id = c.fetchone()[0]
 
             if data.role == constants.STUDENT:
                 student = Student(
-                    auto_id,
+                    user.id,
                     '',
                     memoryview(b''),
                     'image/gif'
@@ -85,7 +85,7 @@ def create(res: Response, data: CreateData):
 
             if data.role == constants.ADMINISTRATIVE:
                 admin = Administrative(
-                    auto_id,
+                    user.id,
                     '',
                     '',
                     'publica',
@@ -98,11 +98,11 @@ def create(res: Response, data: CreateData):
                     'insert into administratives values (%s, %s, %s, %s, %s, %s, %s, %s)',
                     [admin.id, admin.name, admin.acronym, admin.type, admin.country, admin.website, admin.icon, admin.icon_media_type]
                 )
+            token = sessions.create_session(conn, user.id)
 
             conn.commit()
 
-            # Authentication goes here...
-            # Storing user's ID and role somewhere, if possible...
+            sessions.set_auth_cookie(res, token)
 
             res.status_code = 200
             return ok()

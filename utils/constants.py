@@ -1,5 +1,7 @@
 """Constants to be used in the apis namespace."""
 
+SESSION_AGE_SECONDS = 23 #24 * 60 * 60
+
 ADMINISTRATIVE = 'administrativo'
 STUDENT = 'estudiante'
 
