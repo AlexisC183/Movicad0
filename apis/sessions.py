@@ -1,6 +1,7 @@
 from argon2 import PasswordHasher
 from argon2.exceptions import VerifyMismatchError
 from fastapi import Request, Response
+from pydantic import BaseModel
 from app import app
 from db import dbconn
 from utils.res_bodies import ok, log_err, err

@@ -29,7 +29,7 @@ def create_session(conn, user_id: int):
         _hash_session_token(token),
         user_id,
         now,
-        now + timedelta(seconds=constants.SESSION_AGE_SECONDS),
+        now + timedelta(seconds=SESSION_AGE_SECONDS),
         False
     )
 
@@ -60,7 +60,7 @@ def set_auth_cookie(res: Response, token: str):
         httponly=True,
         #secure=True
         samesite='lax',
-        max_age=constants.SESSION_AGE_SECONDS,
+        max_age=SESSION_AGE_SECONDS,
         path='/'
     )
 
