@@ -14,6 +14,7 @@ class UpdateProfileData(BaseModel):
     country: str
     website: str
 
+"""
 @app.patch('/api/administratives/update-profile')
 def update_profile(
     req: Request,
@@ -47,3 +48,4 @@ def update_profile(
         }
     
     trimmed_name = data.name.strip()
+"""

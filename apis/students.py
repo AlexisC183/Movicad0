@@ -10,6 +10,7 @@ class UpdateProfileData(BaseModel):
     name: str
     iconUri: str
 
+"""
 @app.patch('/api/students/update-profile')
 def update_profile(
     req: Request,
@@ -43,3 +44,4 @@ def update_profile(
         }
     
     trimmed_name = data.name.strip()
+"""

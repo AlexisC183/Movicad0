@@ -1,7 +1,7 @@
 """Functions to validate the format of objects."""
 
 from typing import Callable, Dict, Tuple, Optional, Any
-import constants
+from utils import constants
 import base64
 import re
 
@@ -26,10 +26,10 @@ def validate_file(
     data_uri: str,
     byte_max_size: int,
     media_type_pattern: str = '.+/.+'
-) -> (bool, dict | str):
+) -> tuple[bool, dict | str]:
     """Checks whether `data_uri` is valid according to `media_type_pattern` and `byte_max_size`.
     Returns a success bool and the result from parsing the data URI."""
-    if not re.match(f'data:{ media_type_pattern };base64,'):
+    if not re.match(f'data:{ media_type_pattern };base64,', data_uri):
         return (False, 'URI de archivo no válida')
     
     [meta, data] = data_uri.split(',')
