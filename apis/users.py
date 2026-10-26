@@ -155,16 +155,48 @@ def update_password(req: Request, res: Response, data: UpdatePasswordData):
                 res.status_code = 401
                 return no_account()
 
+            pwd_hasher = PasswordHasher()
+
             try:
-                PasswordHasher().verify(user[0], data.oldPassword)
+                pwd_hasher.verify(user[0], data.oldPassword)
             except VerifyMismatchError:
                 res.status_code = 401
                 return err('Contraseña actual incorrecta')
 
-            
+            c.execute(
+                'update users set password = %s where id = %s',
+                [pwd_hasher.hash(data.newPassword), verif['idRolePair']['id']]
+            )
+            conn.commit()
+
+            res.status_code = 200
+            return ok()
     except Exception as e:
         res.status_code = 500
         return log_err(e)
     finally:
         if conn is not None:
             conn.close()
+
+class UpdateStudentProfileData(BaseModel):
+    name: str
+    iconUri: str
+
+class UpdateAdminProfileData(BaseModel):
+    name: str
+    iconUri: str
+    acronym: str
+    type: str
+    country: str
+    website: str
+
+@app.patch('/api/users/update-profile')
+def update_profile(
+    req: Request,
+    res: Response,
+    data: UpdateStudentProfileData | UpdateAdminProfileData
+):
+    verif = verify_requester(req, constants.ADMINISTRATIVE, constants.STUDENT)
+    if verif['fail']:
+        res.status_code = verif['sc']
+        return verif['body']

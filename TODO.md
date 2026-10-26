@@ -1,6 +1,6 @@
 # TODO
-users.update_password
+users.update_profile
 
 # TEST
-
+/api/users/update-password
 

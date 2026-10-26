@@ -1,6 +1,9 @@
 """Functions to validate the format of objects."""
 
 from typing import Callable, Dict, Tuple, Optional, Any
+import constants
+import base64
+import re
 
 def assertion_fail(
     obj: Any,
@@ -17,3 +20,29 @@ def assertion_fail(
             if not pred(value):
                 return suppl()
     return None
+
+
+def validate_file(
+    data_uri: str,
+    byte_max_size: int,
+    media_type_pattern: str = '.+/.+'
+):
+    if not re.match(f'data:{ media_type_pattern };base64,'):
+        return (False, 'URI de archivo no válida')
+    
+    [meta, data] = data_uri.split(',')
+    media_type = meta[5:meta.index(';')]
+
+    try:
+        bytes = base64.b64decode(data)
+    except Exception as e:
+        return (False, 'Cadena Base64 de archivo no válida')
+
+    if len(bytes) > byte_max_size:
+        return (False, f'El archivo no puede exceder los { byte_max_size / constants.MEGABYTE } MB')
+
+    return (True, {
+        'media_type': media_type,
+        'content': bytes
+    })
+    
