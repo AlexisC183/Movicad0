@@ -1,15 +1,16 @@
 from argon2 import PasswordHasher
+from argon2.exceptions import VerifyMismatchError
 from app import app
 from db import dbconn
 from datetime import datetime, timezone
-from fastapi import Response
+from fastapi import Request, Response
 from pydantic import BaseModel
 from functools import partial
 from models import User, Student, Administrative
 from utils import constants
-from utils import sessions
+from utils.sessions import create_session, set_auth_cookie, verify_requester
 from utils.validation import assertion_fail
-from utils.res_bodies import err, log_err, ok
+from utils.res_bodies import err, log_err, ok, no_account
 import re
 
 class CreateData(BaseModel):
@@ -97,11 +98,11 @@ def create(res: Response, data: CreateData):
                     'insert into administratives values (%s, %s, %s, %s, %s, %s, %s, %s)',
                     [admin.id, admin.name, admin.acronym, admin.type, admin.country, admin.website, admin.icon, admin.icon_media_type]
                 )
-            token = sessions.create_session(conn, user.id)
+            token = create_session(conn, user.id)
 
             conn.commit()
 
-            sessions.set_auth_cookie(res, token)
+            set_auth_cookie(res, token)
 
             res.status_code = 200
             return ok()
@@ -111,4 +112,59 @@ def create(res: Response, data: CreateData):
     finally:
         if conn is not None:
             conn.close()
+
+class UpdatePasswordData(BaseModel):
+    oldPassword: str
+    newPassword: str
+    newPassword1: str
             
+@app.patch('/api/users/update-password')
+def update_password(req: Request, res: Response, data: UpdatePasswordData):
+    verif = verify_requester(req, constants.ADMINISTRATIVE, constants.STUDENT)
+    if verif['fail']:
+        res.status_code = verif['sc']
+        return verif['body']
+
+    if data.newPassword != data.newPassword1:
+        res.status_code = 400
+        return err('Las contraseñas no coinciden')
+
+    if body := assertion_fail(data, {
+        'newPassword': (
+            lambda pwd: (
+                8 <= len(pwd) <= 50 and
+                any([not ch.isalnum() for ch in pwd]) and
+                not all([ch == pwd[0] for ch in pwd])
+            ),
+            partial(err, 'La contraseña debe tener longitud [8, 50], un carácter especial y caracteres diferentes')
+        )
+    }):
+        res.status_code = 400
+        return body
+
+    conn = None
+    try:
+        conn = dbconn()
+        with conn.cursor() as c:
+            c.execute(
+                'select password from users where not deleted and id = %s',
+                [verif['idRolePair']['id']]
+            )
+            user = c.fetchone()
+            if not user:
+                res.status_code = 401
+                return no_account()
+
+            try:
+                PasswordHasher().verify(user[0], data.oldPassword)
+            except VerifyMismatchError:
+                res.status_code = 401
+                return err('Contraseña actual incorrecta')
+
+            
+    except Exception as e:
+        res.status_code = 500
+        return log_err(e)
+    finally:
+        if conn is not None:
+            conn.close()

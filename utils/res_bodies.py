@@ -14,6 +14,10 @@ def log_err(e: Exception):
     print(e)
     return err('No se pudieron obtener o guardar datos')
 
+def no_account():
+    """Returns a dict with a message of deleted account."""
+    return err('Su cuenta ha sido eliminada. No se puede proseguir.')
+
 def ok(data: Any = None):
     """Returns a dict with 'status' = 'ok' and optionally the supplied `data`."""
     body = { 'status': 'ok' }
