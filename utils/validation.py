@@ -26,7 +26,9 @@ def validate_file(
     data_uri: str,
     byte_max_size: int,
     media_type_pattern: str = '.+/.+'
-):
+) -> (bool, dict | str):
+    """Checks whether `data_uri` is valid according to `media_type_pattern` and `byte_max_size`.
+    Returns a success bool and the result from parsing the data URI."""
     if not re.match(f'data:{ media_type_pattern };base64,'):
         return (False, 'URI de archivo no válida')
     

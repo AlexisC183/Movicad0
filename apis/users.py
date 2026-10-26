@@ -177,26 +177,3 @@ def update_password(req: Request, res: Response, data: UpdatePasswordData):
     finally:
         if conn is not None:
             conn.close()
-
-class UpdateStudentProfileData(BaseModel):
-    name: str
-    iconUri: str
-
-class UpdateAdminProfileData(BaseModel):
-    name: str
-    iconUri: str
-    acronym: str
-    type: str
-    country: str
-    website: str
-
-@app.patch('/api/users/update-profile')
-def update_profile(
-    req: Request,
-    res: Response,
-    data: UpdateStudentProfileData | UpdateAdminProfileData
-):
-    verif = verify_requester(req, constants.ADMINISTRATIVE, constants.STUDENT)
-    if verif['fail']:
-        res.status_code = verif['sc']
-        return verif['body']
