@@ -10,7 +10,7 @@ from models import User, Student, Administrative
 from utils import constants
 from utils.sessions import create_session, set_auth_cookie, verify_requester
 from utils.validation import class_fail
-from utils.res_bodies import err, log_err, ok, no_account
+from utils.res_bodies import err, log_err, ok
 import re
 
 class CreateData(BaseModel):
@@ -147,18 +147,14 @@ def update_password(req: Request, res: Response, data: UpdatePasswordData):
         conn = dbconn()
         with conn.cursor() as c:
             c.execute(
-                'select password from users where not deleted and id = %s',
+                'select password from users where id = %s',
                 [verif['idRolePair']['id']]
             )
-            user = c.fetchone()
-            if not user:
-                res.status_code = 401
-                return no_account()
-
+            [pwd] = c.fetchone()
             pwd_hasher = PasswordHasher()
 
             try:
-                pwd_hasher.verify(user[0], data.oldPassword)
+                pwd_hasher.verify(pwd, data.oldPassword)
             except VerifyMismatchError:
                 res.status_code = 401
                 return err('Contraseña actual incorrecta')

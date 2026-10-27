@@ -4,7 +4,7 @@ from db import dbconn
 from pydantic import BaseModel
 from functools import partial
 from utils import constants
-from utils.res_bodies import err, log_err
+from utils.res_bodies import err, log_err, ok
 from utils.sessions import verify_requester
 from utils.validation import validate_file, vars_fail
 import re
@@ -87,10 +87,28 @@ def update_profile(
     conn = None
     try:
         conn = dbconn()
+        with conn.cursor() as c:
+            c.execute(
+                'update administratives set name = %s, acronym = %s, type = %s, country = %s, website = %s, icon = %s, icon_media_type = %s where id = %s',
+                [
+                    trimmed_name,
+                    trimmed_acronym,
+                    data.type,
+                    data.country,
+                    trimmed_website,
+                    parsed_img_uri['content'],
+                    parsed_img_uri['media_type'],
+                    verif['idRolePair']['id']
+                ]
+            )
+            conn.commit()
 
+            res.status_code = 200
+            return ok()
     except Exception as e:
         res.status_code = 500
         return log_err(e)
     finally:
         if conn is not None:
             conn.close()
+            

@@ -3,7 +3,7 @@ from app import app
 from db import dbconn
 from pydantic import BaseModel
 from utils import constants
-from utils.res_bodies import err, no_account, log_err, ok
+from utils.res_bodies import err, log_err, ok
 from utils.sessions import verify_requester
 from utils.validation import validate_file
 
@@ -52,15 +52,7 @@ def update_profile(
     conn = None
     try:
         conn = dbconn()
-        with conn.cursor() as c:
-            c.execute(
-                'select exists (select 1 from users where not deleted and id = %s)',
-                [verif['idRolePair']['id']]
-            )
-            if not c.fetchone()[0]:
-                res.status_code = 401
-                return no_account()
-            
+        with conn.cursor() as c:            
             c.execute(
                 'update students set name = %s, icon = %s, icon_media_type = %s where id = %s',
                 [
