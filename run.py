@@ -1,2 +1,2 @@
 from app import app
-from apis import sessions, users
+from apis import administratives, sessions, students, users

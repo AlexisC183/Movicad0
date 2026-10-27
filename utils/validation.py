@@ -53,7 +53,7 @@ def validate_file(
 
     try:
         bytes = base64.b64decode(data)
-    except Exception as e:
+    except Exception:
         return (False, 'Cadena Base64 de archivo no válida')
 
     if len(bytes) > byte_max_size:
