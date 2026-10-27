@@ -9,7 +9,7 @@ from functools import partial
 from models import User, Student, Administrative
 from utils import constants
 from utils.sessions import create_session, set_auth_cookie, verify_requester
-from utils.validation import assertion_fail
+from utils.validation import class_fail
 from utils.res_bodies import err, log_err, ok, no_account
 import re
 
@@ -25,7 +25,7 @@ def create(res: Response, data: CreateData):
         res.status_code = 400
         return err('Las contraseñas no coinciden')
 
-    if body := assertion_fail(data, {
+    if body := class_fail(data, {
         'id': (
             lambda id: 1 <= len(id) <= 50 and bool(re.fullmatch('\\w+', id, re.ASCII)),
             partial(err, 'El identificador debe tener longitud [1, 50] y solo permite los caracteres [a-zA-Z0-9_]')
@@ -129,7 +129,7 @@ def update_password(req: Request, res: Response, data: UpdatePasswordData):
         res.status_code = 400
         return err('Las contraseñas no coinciden')
 
-    if body := assertion_fail(data, {
+    if body := class_fail(data, {
         'newPassword': (
             lambda pwd: (
                 8 <= len(pwd) <= 50 and

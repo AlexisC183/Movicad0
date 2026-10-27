@@ -1,10 +1,13 @@
 from fastapi import Request, Response
 from app import app
+from db import dbconn
 from pydantic import BaseModel
+from functools import partial
 from utils import constants
-from utils.res_bodies import err
+from utils.res_bodies import err, log_err
 from utils.sessions import verify_requester
-from utils.validation import validate_file
+from utils.validation import validate_file, vars_fail
+import re
 
 class UpdateProfileData(BaseModel):
     name: str
@@ -14,7 +17,6 @@ class UpdateProfileData(BaseModel):
     country: str
     website: str
 
-"""
 @app.patch('/api/administratives/update-profile')
 def update_profile(
     req: Request,
@@ -35,7 +37,7 @@ def update_profile(
             'image/(gif|jpeg|png|webp|svg\\+xml)'
         )
     
-    if uri_validation and not uri_validation[0]:
+    if uri_validation and uri_validation[0] == False:
         res.status_code = 400
         return err(uri_validation[1])
 
@@ -48,4 +50,47 @@ def update_profile(
         }
     
     trimmed_name = data.name.strip()
-"""
+    trimmed_acronym = data.acronym.strip()
+    trimmed_website = data.website.strip()
+
+    if body := vars_fail(
+        (
+            trimmed_name,
+            lambda name: len(name) <= 200,
+            partial(err, 'Su nombre es muy largo')
+        ),
+        (
+            trimmed_acronym,
+            lambda ac: len(ac) <= 100,
+            partial(err, 'Su acrónimo es muy largo')
+        ),
+        (
+            data.type,
+            lambda ty: ty in ('publica', 'privada', 'comunitaria'),
+            partial(err, 'Tipo no válido')
+        ),
+        (
+            data.country,
+            lambda c: c in ('otro', 'mexico', 'china'),
+            partial(err, 'País no válido')
+        )
+    ):
+        res.status_code = 400
+        return body
+
+    if (
+        len(trimmed_website) > 0 and
+        not re.match('https?://', trimmed_website, re.I)
+    ):
+        trimmed_website = 'http://' + trimmed_website
+
+    conn = None
+    try:
+        conn = dbconn()
+
+    except Exception as e:
+        res.status_code = 500
+        return log_err(e)
+    finally:
+        if conn is not None:
+            conn.close()
