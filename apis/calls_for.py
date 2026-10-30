@@ -1,6 +1,6 @@
 from argon2 import PasswordHasher
 from argon2.exceptions import VerifyMismatchError
-from fastapi import Request, Response
+from fastapi import Request, Response, Query
 from app import app
 from datetime import date, datetime, time, timezone
 from db import dbconn
@@ -12,6 +12,27 @@ from utils.res_bodies import err, log_err, ok
 from utils.sessions import verify_requester
 from utils.validation import vars_fail
 from models import CallFor
+from typing import Annotated
+
+@app.get('/api/calls-for/read') # ReadAll
+def read_all(
+    req: Request,
+    res: Response,
+    cursor_pos_maybe: Annotated[int | None, Query(alias='cursor-pos')] = None,
+    search_term: Annotated[str, Query(alias='search-term')] = '',
+    country: str = '',
+    admin_id: Annotated[int | None, Query(alias='admin-id')] = None,
+    open_only: Annotated[bool, Query(alias='open-only')] = False
+):
+    verif = verify_requester(req, constants.ADMINISTRATIVE, constants.STUDENT)
+    if verif['fail']:
+        res.status_code = verif['sc']
+        return verif['body']
+
+    
+
+# @app.get('/api/calls-for/read/{key}') # Read
+# @app.get('/api/calls-for/read-by-student') # ReadByStudent
 
 class CreateData(BaseModel):
     title: str
