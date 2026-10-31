@@ -40,7 +40,7 @@ def fetch_paginated(
     sort_column: str,
     param_vals: Iterable[Any] = [],
     cursor_pos: int = 1
-):
+) -> list[tuple[Any, ...]]:
     """
     Executes `unsrt_unpg_sql`, sorted descending by `sort_column`.
     Returns paginated results.

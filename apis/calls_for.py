@@ -14,6 +14,7 @@ from utils.sessions import verify_requester
 from utils.validation import vars_fail
 from models import CallFor
 from typing import Annotated
+import base64
 
 @app.get('/api/calls-for/read')
 def read_all(
@@ -33,12 +34,13 @@ def read_all(
     trimmed_search_term = search_term.strip()
 
     json_keys = ['icon', 'iconMediaType', 'id', 'title', 'publishDate', 'country']
-    query = 'select a.icon, a.icon_media_type, cf.id, cf.title, cf.publish_date, cf.country from calls_for cf join administratives a on cf.administrative_id = a.id join users u on a.id = u.id'
+    query = 'select a.icon, a.icon_media_type, cf.id, cf.title, cf.publish_date, cf.destination_country from calls_for cf join administratives a on cf.administrative_id = a.id join users u on a.id = u.id'
     where = 'where not cf.deleted and not u.deleted'
 
     if open_only:
         where += " and now() between coalesce(cf.initial_date, '-infinity') and coalesce(cf.final_date, 'infinity')"
 
+    param_vals = []
     if trimmed_search_term:
         where += ' and (cf.title like %s or cf.id = %s)'
         param_vals = [
@@ -46,7 +48,7 @@ def read_all(
             try_int(trimmed_search_term)
         ]
     elif country:
-        where += ' and cf.country = %s'
+        where += ' and cf.destination_country = %s'
         param_vals = [country]
     elif admin_id is not None:
         where += ' and cf.administrative_id = %s'
@@ -73,6 +75,9 @@ def read_all(
             cursor_pos
         )
         calls_for = [dict(zip(json_keys, row)) for row in calls_for_rows]
+
+        for cf in calls_for:
+            cf['icon'] = base64.b64encode(cf['icon'].tobytes())
 
         if len(calls_for) == constants.PAGE_SIZE:
             new_cursor_pos = calls_for[-1]['id']
