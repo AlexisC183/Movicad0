@@ -8,13 +8,14 @@ from functools import partial
 from pydantic import BaseModel
 from utils import constants
 from utils import sql
+from utils.converters import try_int
 from utils.res_bodies import err, log_err, ok
 from utils.sessions import verify_requester
 from utils.validation import vars_fail
 from models import CallFor
 from typing import Annotated
 
-@app.get('/api/calls-for/read') # ReadAll
+@app.get('/api/calls-for/read')
 def read_all(
     req: Request,
     res: Response,
@@ -29,6 +30,66 @@ def read_all(
         res.status_code = verif['sc']
         return verif['body']
 
+    trimmed_search_term = search_term.strip()
+
+    json_keys = ['icon', 'iconMediaType', 'id', 'title', 'publishDate', 'country']
+    query = 'select a.icon, a.icon_media_type, cf.id, cf.title, cf.publish_date, cf.country from calls_for cf join administratives a on cf.administrative_id = a.id join users u on a.id = u.id'
+    where = 'where not cf.deleted and not u.deleted'
+
+    if open_only:
+        where += " and now() between coalesce(cf.initial_date, '-infinity') and coalesce(cf.final_date, 'infinity')"
+
+    if trimmed_search_term:
+        where += ' and (cf.title like %s or cf.id = %s)'
+        param_vals = [
+            f'%{ trimmed_search_term }%',
+            try_int(trimmed_search_term)
+        ]
+    elif country:
+        where += ' and cf.country = %s'
+        param_vals = [country]
+    elif admin_id is not None:
+        where += ' and cf.administrative_id = %s'
+        param_vals = [admin_id]
+
+    conn = None
+    try:
+        conn = dbconn()
+        if cursor_pos_maybe is None:
+            cursor_pos = sql.get_init_cursor_pos(
+                conn,
+                f'select cf.id from calls_for cf join users u on cf.administrative_id = u.id { where }',
+                'cf.id',
+                param_vals
+            )
+        else:
+            cursor_pos = cursor_pos_maybe
+
+        calls_for_rows = sql.fetch_paginated(
+            conn,
+            f'{ query } { where }',
+            'cf.id',
+            param_vals,
+            cursor_pos
+        )
+        calls_for = [dict(zip(json_keys, row)) for row in calls_for_rows]
+
+        if len(calls_for) == constants.PAGE_SIZE:
+            new_cursor_pos = calls_for[-1]['id']
+        else:
+            new_cursor_pos = constants.FINAL_CURSOR_POS
+      
+        res.status_code = 200
+        return ok({
+            'cursorPosition': new_cursor_pos,
+            'callsFor': calls_for
+        }) | { 'idRolePair': verif['idRolePair'] }
+    except Exception as e:
+        res.status_code = 500
+        return log_err(e)
+    finally:
+        if conn is not None:
+            conn.close()
     
 
 # @app.get('/api/calls-for/read/{key}') # Read

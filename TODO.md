@@ -3,6 +3,7 @@
 
 
 # TEST
+/api/calls-for/read
 /api/calls-for/create
 /api/calls-for/update
 /api/calls-for/delete
