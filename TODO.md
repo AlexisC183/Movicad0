@@ -1,10 +1,10 @@
 # TODO
-calls_for.read_by_student
 
 
 # TEST
 /api/calls-for/read <- OK
 /api/calls-for/read/{id}
+/api/calls-for/read-by-student
 /api/calls-for/create
 /api/calls-for/update
 /api/calls-for/delete

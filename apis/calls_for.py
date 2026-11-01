@@ -155,7 +155,51 @@ def read_by_student(
         return verif['body']
 
     json_keys = ['icon', 'iconMediaType', 'id', 'title', 'publishDate', 'country']
-    query = 'select a.icon, a.icon_media_type, cf.id, cf.title, cf.publish_date, cf.destination_country from applications ap join calls_for cf on ap.call_for_id = cf.id join administratives a on cf.administrative_id = a.id join users u on a.id = u.id where not ap.deleted and not cf.deleted and not u.deleted'
+    query = 'select a.icon, a.icon_media_type, cf.id, cf.title, cf.publish_date, cf.destination_country from applications ap join calls_for cf on ap.call_for_id = cf.id join administratives a on cf.administrative_id = a.id join users u on a.id = u.id'
+    where = 'where not ap.deleted and not cf.deleted and not u.deleted and ap.student_id = %s'
+    param_vals = [verif['idRolePair']['id']]
+    conn = None
+
+    try:
+        conn = dbconn()
+        if cursor_pos_maybe is None:
+            cursor_pos = sql.get_init_cursor_pos(
+                conn,
+                f'select ap.id from applications ap join calls_for cf on ap.call_for_id = cf.id join users u on cf.administrative_id = u.id { where }',
+                'ap.id',
+                param_vals
+            )
+        else:
+            cursor_pos = cursor_pos_maybe
+
+        calls_for_rows = sql.fetch_paginated(
+            conn,
+            f'{ query } { where }',
+            'ap.id',
+            param_vals,
+            cursor_pos
+        )
+        calls_for = [dict(zip(json_keys, row)) for row in calls_for_rows]
+
+        for cf in calls_for:
+            cf['icon'] = base64.b64encode(cf['icon'].tobytes())
+
+        if len(calls_for) == constants.PAGE_SIZE:
+            new_cursor_pos = calls_for[-1]['id']
+        else:
+            new_cursor_pos = constants.FINAL_CURSOR_POS
+      
+        res.status_code = 200
+        return ok({
+            'cursorPosition': new_cursor_pos,
+            'callsFor': calls_for
+        }) | { 'idRolePair': verif['idRolePair'] }
+    except Exception as e:
+        res.status_code = 500
+        return log_err(e)
+    finally:
+        if conn is not None:
+            conn.close()
 
 class CreateData(BaseModel):
     title: str
