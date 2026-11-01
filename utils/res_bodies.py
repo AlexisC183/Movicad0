@@ -9,6 +9,10 @@ def err(msg: str):
         'message': msg
     }
 
+def not_found():
+    """Returns a dict with 'status' = 'not_found'."""
+    return { 'status': 'not_found' }
+
 def log_err(e: Exception):
     """Returns a dict with a generic error message to expose to clients, while printing `e`."""
     print(e)

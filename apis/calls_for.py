@@ -9,7 +9,7 @@ from pydantic import BaseModel
 from utils import constants
 from utils import sql
 from utils.converters import try_int
-from utils.res_bodies import err, log_err, ok
+from utils.res_bodies import err, log_err, ok, not_found
 from utils.sessions import verify_requester
 from utils.validation import vars_fail
 from models import CallFor
@@ -109,9 +109,53 @@ def read(
         return verif['body']
 
     json_keys = [
-        
+        'title',
+        'description',
+        'requirements',
+        'initialDate',
+        'finalDate',
+        'modification',
+        'country',
+        'adminId',
+        'acronym',
     ]
-# @app.get('/api/calls-for/read-by-student') # ReadByStudent
+    query = 'select cf.title, cf.description, cf.requirements, cf.initial_date, cf.final_date, cf.modification, cf.destination_country, a.id, a.acronym from calls_for cf join administratives a on cf.administrative_id = a.id where not cf.deleted and not u.deleted and cf.id = %s'
+    conn = None
+
+    try:
+        conn = dbconn()
+        with conn.cursor() as c:
+            c.execute(query, [id])
+            call_for_row = c.fetchone()
+
+            if not call_for_row:
+                res.status_code = 404
+                return not_found()
+
+            call_for = dict(zip(json_keys, call_for_row))
+
+            res.status_code = 200
+            return ok(call_for) | { 'idRolePair': verif['idRolePair'] }
+    except Exception as e:
+        res.status_code = 500
+        return log_err(e)
+    finally:
+        if conn is not None:
+            conn.close()
+
+@app.get('/api/calls-for/read-by-student')
+def read_by_student(
+    req: Request,
+    res: Response,
+    cursor_pos_maybe: Annotated[int | None, Query(alias='cursor-pos')] = None
+):
+    verif = verify_requester(req, constants.STUDENT)
+    if verif['fail']:
+        res.status_code = verif['sc']
+        return verif['body']
+
+    json_keys = ['icon', 'iconMediaType', 'id', 'title', 'publishDate', 'country']
+    query = 'select a.icon, a.icon_media_type, cf.id, cf.title, cf.publish_date, cf.destination_country from applications ap join calls_for cf on ap.call_for_id = cf.id join administratives a on cf.administrative_id = a.id join users u on a.id = u.id where not ap.deleted and not cf.deleted and not u.deleted'
 
 class CreateData(BaseModel):
     title: str
