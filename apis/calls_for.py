@@ -97,7 +97,20 @@ def read_all(
             conn.close()
     
 
-# @app.get('/api/calls-for/read/{key}') # Read
+@app.get('/api/calls-for/read/{id}')
+def read(
+    req: Request,
+    res: Response,
+    id: int
+):
+    verif = verify_requester(req, constants.ADMINISTRATIVE, constants.STUDENT)
+    if verif['fail']:
+        res.status_code = verif['sc']
+        return verif['body']
+
+    json_keys = [
+        
+    ]
 # @app.get('/api/calls-for/read-by-student') # ReadByStudent
 
 class CreateData(BaseModel):
