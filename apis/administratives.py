@@ -1,13 +1,94 @@
-from fastapi import Request, Response
+from fastapi import Request, Response, Query
 from app import app
 from db import dbconn
 from pydantic import BaseModel
 from functools import partial
 from utils import constants
+from utils import sql
+from utils.converters import try_int
 from utils.res_bodies import err, log_err, ok
 from utils.sessions import verify_requester
 from utils.validation import validate_file, vars_fail
+from typing import Annotated
+import base64
 import re
+
+@app.get('/api/administratives/read')
+def read_all(
+    req: Request,
+    res: Response,
+    cursor_pos_maybe: Annotated[int | None, Query(alias='cursor-pos')] = None,
+    search_term: Annotated[str, Query(alias='search-term')] = '',
+    type: str = '',
+    country: str = ''
+):
+    verif = verify_requester(req, constants.ADMINISTRATIVE, constants.STUDENT)
+    if verif['fail']:
+        res.status_code = verif['sc']
+        return verif['body']
+
+    trimmed_search_term = search_term.strip()
+
+    json_keys = ['id', 'name', 'type', 'country', 'icon', 'iconMediaType']
+    query = 'select a.id, a.name, a.type, a.country, a.icon, a.icon_media_type from administratives a join users u on a.id = u.id'
+    where = 'where not u.deleted'
+
+    param_vals = []
+    if trimmed_search_term:
+        where += ' and (a.name like %s or a.acronym like %s or a.id = %s)'
+        param_vals = [
+            f'%{ trimmed_search_term }%',
+            f'%{ trimmed_search_term }%',
+            try_int(trimmed_search_term)
+        ]
+    elif type:
+        where += ' and a.type = %s'
+        param_vals = [type]
+    elif country:
+        where += ' and a.country = %s'
+        param_vals = [country]
+
+    conn = None
+    try:
+        conn = dbconn()
+        if cursor_pos_maybe is None:
+            cursor_pos = sql.get_init_cursor_pos(
+                conn,
+                f'select a.id from administratives a join users u on a.id = u.id { where }',
+                'a.id',
+                param_vals
+            )
+        else:
+            cursor_pos = cursor_pos_maybe
+
+        admin_rows = sql.fetch_paginated(
+            conn,
+            f'{ query } { where }',
+            'a.id',
+            param_vals,
+            cursor_pos
+        )
+        admins = [dict(zip(json_keys, row)) for row in admin_rows]
+
+        for admin in admins:
+            admin['icon'] = base64.b64encode(admin['icon'].tobytes())
+
+        if len(admins) == constants.PAGE_SIZE:
+            new_cursor_pos = admins[-1]['id']
+        else:
+            new_cursor_pos = constants.FINAL_CURSOR_POS
+      
+        res.status_code = 200
+        return ok({
+            'cursorPosition': new_cursor_pos,
+            'administratives': admins
+        }) | { 'idRolePair': verif['idRolePair'] }
+    except Exception as e:
+        res.status_code = 500
+        return log_err(e)
+    finally:
+        if conn is not None:
+            conn.close()
 
 class UpdateProfileData(BaseModel):
     name: str

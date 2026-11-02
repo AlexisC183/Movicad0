@@ -2,6 +2,8 @@
 
 
 # TEST
+/api/administratives/read
+
 /api/applications/create
 /api/applications/delete
 

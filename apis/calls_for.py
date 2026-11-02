@@ -67,14 +67,14 @@ def read_all(
         else:
             cursor_pos = cursor_pos_maybe
 
-        calls_for_rows = sql.fetch_paginated(
+        call_for_rows = sql.fetch_paginated(
             conn,
             f'{ query } { where }',
             'cf.id',
             param_vals,
             cursor_pos
         )
-        calls_for = [dict(zip(json_keys, row)) for row in calls_for_rows]
+        calls_for = [dict(zip(json_keys, row)) for row in call_for_rows]
 
         for cf in calls_for:
             cf['icon'] = base64.b64encode(cf['icon'].tobytes())
