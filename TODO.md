@@ -2,6 +2,9 @@
 
 
 # TEST
+/api/applications/create
+/api/applications/delete
+
 /api/calls-for/read <- OK
 /api/calls-for/read/{id}
 /api/calls-for/read-by-student
