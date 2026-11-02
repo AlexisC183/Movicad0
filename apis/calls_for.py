@@ -119,7 +119,7 @@ def read(
         'adminId',
         'acronym',
     ]
-    query = 'select cf.title, cf.description, cf.requirements, cf.initial_date, cf.final_date, cf.modification, cf.destination_country, a.id, a.acronym from calls_for cf join administratives a on cf.administrative_id = a.id where not cf.deleted and not u.deleted and cf.id = %s'
+    query = 'select cf.title, cf.description, cf.requirements, cf.initial_date, cf.final_date, cf.modification, cf.destination_country, a.id, a.acronym from calls_for cf join administratives a on cf.administrative_id = a.id join users u on a.id = u.id where not cf.deleted and not u.deleted and cf.id = %s'
     conn = None
 
     try:
