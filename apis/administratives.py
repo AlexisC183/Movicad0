@@ -2,11 +2,12 @@ from fastapi import Request, Response, Query
 from app import app
 from db import dbconn
 from pydantic import BaseModel
+from datetime import datetime, timezone
 from functools import partial
 from utils import constants
 from utils import sql
 from utils.converters import try_int
-from utils.res_bodies import err, log_err, ok
+from utils.res_bodies import err, log_err, ok, not_found
 from utils.sessions import verify_requester
 from utils.validation import validate_file, vars_fail
 from typing import Annotated
@@ -89,6 +90,62 @@ def read_all(
     finally:
         if conn is not None:
             conn.close()
+
+@app.get('/api/administratives/read/{id}')
+def read(
+    req: Request,
+    res: Response,
+    id: int
+):
+    verif = verify_requester(req, constants.ADMINISTRATIVE, constants.STUDENT)
+    if verif['fail']:
+        res.status_code = verif['sc']
+        return verif['body']
+
+    json_keys = [
+        'id',
+        'acronym',
+        'icon',
+        'iconMediaType',
+        'name',
+        'type',
+        'country',
+        'website'
+    ]
+    query = 'select a.id, a.acronym, a.icon, a.icon_media_type, a.name, a.type, a.country, a.website from administratives a join users u on a.id = u.id where not u.deleted and u.id = %s'
+    conn = None
+
+    try:
+        conn = dbconn()
+        with conn.cursor() as c:
+            c.execute(query, [id])
+            admin_row = c.fetchone()
+
+            if not admin_row:
+                res.status_code = 404
+                return not_found()
+
+            admin = dict(zip(json_keys, admin_row))
+
+            res.status_code = 200
+            return ok(admin) | { 'idRolePair': verif['idRolePair'] }
+    except Exception as e:
+        res.status_code = 500
+        return log_err(e)
+    finally:
+        if conn is not None:
+            conn.close()
+
+@app.get('/api/administratives/me')
+def dashboard(req: Request, res: Response):
+    verif = verify_requester(req, constants.ADMINISTRATIVE)
+    if verif['fail']:
+        res.status_code = verif['sc']
+        return verif['body']
+
+    now = datetime.now(timezone.utc)
+    conn = None
+
 
 class UpdateProfileData(BaseModel):
     name: str
