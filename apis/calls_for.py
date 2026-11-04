@@ -8,13 +8,12 @@ from functools import partial
 from pydantic import BaseModel
 from utils import constants
 from utils import sql
-from utils.converters import try_int
+from utils.converters import try_int, memoryview_to_b64
 from utils.res_bodies import err, log_err, ok, not_found
 from utils.sessions import verify_requester
 from utils.validation import vars_fail
 from models import CallFor
 from typing import Annotated
-import base64
 
 @app.get('/api/calls-for/read')
 def read_all(
@@ -77,7 +76,7 @@ def read_all(
         calls_for = [dict(zip(json_keys, row)) for row in call_for_rows]
 
         for cf in calls_for:
-            cf['icon'] = base64.b64encode(cf['icon'].tobytes())
+            cf['icon'] = memoryview_to_b64(cf['icon'])
 
         if len(calls_for) == constants.PAGE_SIZE:
             new_cursor_pos = calls_for[-1]['id']
@@ -182,7 +181,7 @@ def read_by_student(
         calls_for = [dict(zip(json_keys, row)) for row in calls_for_rows]
 
         for cf in calls_for:
-            cf['icon'] = base64.b64encode(cf['icon'].tobytes())
+            cf['icon'] = memoryview_to_b64(cf['icon'])
 
         if len(calls_for) == constants.PAGE_SIZE:
             new_cursor_pos = calls_for[-1]['id']

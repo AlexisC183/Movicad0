@@ -5,10 +5,10 @@ from pydantic import BaseModel
 from typing import Annotated
 from utils import constants
 from utils import sql
+from utils.converters import memoryview_to_b64
 from utils.res_bodies import err, log_err, ok, not_found, forbidden
 from utils.sessions import verify_requester
 from utils.validation import validate_file
-import base64
 
 @app.get('/api/students/me')
 def read(req: Request, res: Response):
@@ -26,6 +26,8 @@ def read(req: Request, res: Response):
         with conn.cursor() as c:
             c.execute(query, [verif['idRolePair']['id']])
             student = dict(zip(json_keys, c.fetchone()))
+
+            student['icon'] = memoryview_to_b64(student['icon'])
 
             res.status_code = 200
             return ok(student) | { 'idRolePair': verif['idRolePair'] }
@@ -91,7 +93,7 @@ def read_by(
             students = [dict(zip(json_keys, row)) for row in student_rows]
 
             for student in students:
-                student['icon'] = base64.b64encode(student['icon'].tobytes())
+                student['icon'] = memoryview_to_b64(student['icon'])
 
             if len(students) == constants.PAGE_SIZE:
                 new_cursor_pos = students[-1]['id']

@@ -5,12 +5,11 @@ from pydantic import BaseModel
 from functools import partial
 from utils import constants
 from utils import sql
-from utils.converters import try_int
+from utils.converters import try_int, memoryview_to_b64
 from utils.res_bodies import err, log_err, ok, not_found
 from utils.sessions import verify_requester
 from utils.validation import validate_file, vars_fail
 from typing import Annotated
-import base64
 import re
 
 @app.get('/api/administratives/read')
@@ -71,7 +70,7 @@ def read_all(
         admins = [dict(zip(json_keys, row)) for row in admin_rows]
 
         for admin in admins:
-            admin['icon'] = base64.b64encode(admin['icon'].tobytes())
+            admin['icon'] = memoryview_to_b64(admin['icon'])
 
         if len(admins) == constants.PAGE_SIZE:
             new_cursor_pos = admins[-1]['id']
@@ -126,6 +125,8 @@ def read(
 
             admin = dict(zip(json_keys, admin_row))
 
+            admin['icon'] = memoryview_to_b64(admin['icon'])
+
             res.status_code = 200
             return ok(admin) | { 'idRolePair': verif['idRolePair'] }
     except Exception as e:
@@ -157,13 +158,17 @@ def dashboard(req: Request, res: Response):
     """
 
     applicant_avg_q = """
-    select avg(appl_cnt) from (
-        select cf.id as call_for, count(ap.*) as appl_cnt
-        from calls_for cf
-        left join applications ap on cf.id = ap.call_for_id
-        join users s on ap.student_id = s.id
-        where not s.deleted and not ap.deleted and not cf.deleted and cf.administrative_id = %s
-        group by cf.id
+    select coalesce(avg(appl_cnt), 0) from (
+    	select cf.id as call_for, count(ap.*) as appl_cnt
+    	from calls_for cf
+    	left join (
+			select ap.call_for_id
+			from applications ap
+			join users s on ap.student_id = s.id
+			where not ap.deleted and not s.deleted
+    	) ap on cf.id = ap.call_for_id
+    	where not cf.deleted and cf.administrative_id = %s
+    	group by cf.id
     )
     """
     
