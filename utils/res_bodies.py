@@ -9,6 +9,10 @@ def err(msg: str):
         'message': msg
     }
 
+def forbidden():
+    """Returns a dict with 'status' = 'forbidden'."""
+    return { 'status': 'forbidden' }
+
 def not_found():
     """Returns a dict with 'status' = 'not_found'."""
     return { 'status': 'not_found' }

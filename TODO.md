@@ -1,8 +1,11 @@
 # TODO
-administratives.dashboard
 
 # TEST
+/api/students/me
+/api/students/read
+
 /api/administratives/read/{id}
+/api/administratives/me
 
 # Walking the relational hierarchy bottom to top
 ```sql

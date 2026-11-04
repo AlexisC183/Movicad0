@@ -2,7 +2,6 @@ from fastapi import Request, Response, Query
 from app import app
 from db import dbconn
 from pydantic import BaseModel
-from datetime import datetime, timezone
 from functools import partial
 from utils import constants
 from utils import sql
@@ -143,9 +142,71 @@ def dashboard(req: Request, res: Response):
         res.status_code = verif['sc']
         return verif['body']
 
-    now = datetime.now(timezone.utc)
-    conn = None
+    open_cf_cnt_q = "select count(*) from calls_for where not deleted and administrative_id = %s and now() between coalesce(initial_date, '-infinity') and coalesce(final_date, 'infinity')"
 
+    cf_cnt_q = 'select count(*) from calls_for where not deleted and administrative_id = %s'
+
+    cf_history_cnt_q = 'select count(*) from calls_for where administrative_id = %s'
+
+    applicant_cnt_q = """
+    select count(ap.*)
+    from applications ap
+    join calls_for cf on ap.call_for_id = cf.id
+    join users s on ap.student_id = s.id
+    where not s.deleted and not ap.deleted and not cf.deleted and cf.administrative_id = %s
+    """
+
+    applicant_avg_q = """
+    select avg(appl_cnt) from (
+        select cf.id as call_for, count(ap.*) as appl_cnt
+        from calls_for cf
+        left join applications ap on cf.id = ap.call_for_id
+        join users s on ap.student_id = s.id
+        where not s.deleted and not ap.deleted and not cf.deleted and cf.administrative_id = %s
+        group by cf.id
+    )
+    """
+    
+    gt1_cf_applicant_cnt_q = """
+    select count(*) from (
+        select student, count(call_for) from (
+            select cf.id as call_for, ap.student_id as student
+            from calls_for cf
+            join applications ap on cf.id = ap.call_for_id
+            join users s on ap.student_id = s.id
+            where not s.deleted and not ap.deleted and not cf.deleted and cf.administrative_id = %s
+        )
+        group by student having count(call_for) > 1
+    )
+    """
+
+    conn = None
+    try:
+        conn = dbconn()
+        with conn.cursor() as c:
+            c.execute(
+                f'select ({ open_cf_cnt_q }), ({ cf_cnt_q }), ({ cf_history_cnt_q }), ({ applicant_cnt_q }), ({ applicant_avg_q }), ({ gt1_cf_applicant_cnt_q })',
+                [verif['idRolePair']['id']] * 6
+            )
+
+            json_keys = [
+                'openCallsFor',
+                'activeCallsFor',
+                'callForHistory',
+                'applicants',
+                'applicantAverage',
+                'moreThanOneCallForApplicantCount'
+            ]
+            stats = dict(zip(json_keys, c.fetchone()))
+
+            res.status_code = 200
+            return ok(stats) | { 'idRolePair': verif['idRolePair'] }
+    except Exception as e:
+        res.status_code = 500
+        return log_err(e)
+    finally:
+        if conn is not None:
+            conn.close()
 
 class UpdateProfileData(BaseModel):
     name: str

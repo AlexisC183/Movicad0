@@ -1,11 +1,114 @@
-from fastapi import Request, Response
+from fastapi import Request, Response, Query
 from app import app
 from db import dbconn
 from pydantic import BaseModel
+from typing import Annotated
 from utils import constants
-from utils.res_bodies import err, log_err, ok
+from utils import sql
+from utils.res_bodies import err, log_err, ok, not_found, forbidden
 from utils.sessions import verify_requester
 from utils.validation import validate_file
+import base64
+
+@app.get('/api/students/me')
+def read(req: Request, res: Response):
+    verif = verify_requester(req, constants.STUDENT)
+    if verif['fail']:
+        res.status_code = verif['sc']
+        return verif['body']
+
+    json_keys = ['name', 'icon', 'iconMediaType']
+    query = 'select name, icon, icon_media_type from students where id = %s'
+    conn = None
+
+    try:
+        conn = dbconn()
+        with conn.cursor() as c:
+            c.execute(query, [verif['idRolePair']['id']])
+            student = dict(zip(json_keys, c.fetchone()))
+
+            res.status_code = 200
+            return ok(student) | { 'idRolePair': verif['idRolePair'] }
+    except Exception as e:
+        res.status_code = 500
+        return log_err(e)
+    finally:
+        if conn is not None:
+            conn.close()
+
+@app.get('/api/students/read')
+def read_by(
+    req: Request,
+    res: Response,
+    call_for_id: Annotated[int, Query(alias='call-for-id')],
+    cursor_pos_maybe: Annotated[int | None, Query(alias='cursor-pos')] = None,
+):
+    verif = verify_requester(req, constants.ADMINISTRATIVE)
+    if verif['fail']:
+        res.status_code = verif['sc']
+        return verif['body']
+
+    conn = None
+    try:
+        conn = dbconn()
+        with conn.cursor() as c:
+            c.execute(
+                'select cf.administrative_id from calls_for cf join users u on cf.administrative_id = u.id where not cf.deleted and not u.deleted and cf.id = %s',
+                [call_for_id]
+            )
+            call_for = c.fetchone()
+
+            if not call_for:
+                res.status_code = 404
+                return not_found()
+
+            if verif['idRolePair']['id'] != call_for[0]:
+                res.status_code = 403
+                return forbidden()
+
+            json_keys = ['id', 'name', 'icon', 'iconMediaType']
+            query = 'select u.id, s.name, s.icon, s.icon_media_type from applications ap join students s on ap.student_id = s.id join users u on s.id = u.id'
+            where = 'where not ap.deleted and not u.deleted and ap.call_for_id = %s'
+            param_vals = [call_for_id]
+
+            if cursor_pos_maybe is None:
+                cursor_pos = sql.get_init_cursor_pos(
+                    conn,
+                    f'select u.id from applications ap join users u on ap.student_id = u.id { where }',
+                    'u.id',
+                    param_vals
+                )
+            else:
+                cursor_pos = cursor_pos_maybe
+
+            student_rows = sql.fetch_paginated(
+                conn,
+                f'{ query } { where }',
+                'u.id',
+                param_vals,
+                cursor_pos
+            )
+            students = [dict(zip(json_keys, row)) for row in student_rows]
+
+            for student in students:
+                student['icon'] = base64.b64encode(student['icon'].tobytes())
+
+            if len(students) == constants.PAGE_SIZE:
+                new_cursor_pos = students[-1]['id']
+            else:
+                new_cursor_pos = constants.FINAL_CURSOR_POS
+        
+            res.status_code = 200
+            return ok({
+                'cursorPosition': new_cursor_pos,
+                'students': students
+            }) | { 'idRolePair': verif['idRolePair'] }
+    except Exception as e:
+        res.status_code = 500
+        return log_err(e)
+    finally:
+        if conn is not None:
+            conn.close()
 
 class UpdateProfileData(BaseModel):
     name: str
