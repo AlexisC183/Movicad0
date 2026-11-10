@@ -1,10 +1,7 @@
 # TODO
 
 # TEST
-/api/students/me
-/api/students/read
 
-/api/administratives/me
 
 # Walking the relational hierarchy bottom to top
 ```sql
