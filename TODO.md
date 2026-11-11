@@ -3,6 +3,9 @@
 # TEST
 /api/forum-files/read
 /api/forum-files/read/{id}
+/api/forum-files/create
+/api/forum-files/update
+/api/forum-files/delete
 
 # Walking the relational hierarchy bottom to top
 ```sql
