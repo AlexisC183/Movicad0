@@ -43,7 +43,7 @@ def read_by(
     req: Request,
     res: Response,
     call_for_id: Annotated[int, Query(alias='call-for-id')],
-    cursor_pos_maybe: Annotated[int | None, Query(alias='cursor-pos')] = None,
+    cursor_pos_maybe: Annotated[int | None, Query(alias='cursor-pos')] = None
 ):
     verif = verify_requester(req, constants.ADMINISTRATIVE)
     if verif['fail']:

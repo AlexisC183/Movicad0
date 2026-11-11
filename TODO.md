@@ -1,7 +1,8 @@
 # TODO
 
 # TEST
-
+/api/forum-files/read
+/api/forum-files/read/{id}
 
 # Walking the relational hierarchy bottom to top
 ```sql
