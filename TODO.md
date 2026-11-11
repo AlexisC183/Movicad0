@@ -1,6 +1,10 @@
 # TODO
 
 # TEST
+/api/file-requests/create
+/api/file-requests/update
+/api/file-requests/delete
+
 /api/forum-files/read
 /api/forum-files/read/{id}
 /api/forum-files/create
