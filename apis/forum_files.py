@@ -110,7 +110,7 @@ def read_by(
 
             if not c.fetchone()[0]:
                 res.status_code = 404
-                return not_found
+                return not_found()
 
             if verif['idRolePair']['role'] == constants.STUDENT:
                 is_member_q = """
