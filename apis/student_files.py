@@ -1,12 +1,15 @@
 from fastapi import Request, Response, Query
 from fastapi.responses import StreamingResponse
 from app import app
+from datetime import datetime, timezone
 from db import dbconn
 from pydantic import BaseModel
 from utils import constants, sql
-from utils.res_bodies import ok, log_err, not_found, forbidden
+from utils.res_bodies import ok, log_err, not_found, forbidden, err
 from utils.sessions import verify_requester
+from utils.validation import validate_file
 from typing import Annotated
+from models import StudentFile
 
 @app.get('/api/student-files/read/{application_id},{file_req_id}')
 def read(
@@ -47,7 +50,7 @@ def read(
                 [application_id, file_req_id]
             )
 
-            if not c.fetchone():
+            if not c.fetchone()[0]:
                 res.status_code = 404
                 return not_found()
 
@@ -219,5 +222,88 @@ def read_by(
         if conn is not None:
             conn.close()
 
-# @app.post('/api/student-files/create')
-# def create()
+class CreateData(BaseModel):
+    fileRequestId: int
+    name: str
+    fileUri: str
+
+@app.post('/api/student-files/create')
+def create(
+    req: Request,
+    res: Response,
+    data: CreateData
+):
+    verif = verify_requester(req, constants.STUDENT)
+    if verif['fail']:
+        res.status_code = verif['sc']
+        return verif['body']
+
+    uri_validation = validate_file(
+        data.fileUri,
+        30 * constants.MEGABYTE,
+    )
+
+    if uri_validation[0] == False:
+        res.status_code = 400
+        return err(uri_validation[1])
+
+    conn = None
+    try:
+        conn = dbconn()
+        with conn.cursor() as c:
+            c.execute(
+                'select cf.id from file_requests fr join calls_for cf on fr.call_for_id = cf.id join users a on cf.administrative_id = a.id where not fr.deleted and not cf.deleted and not a.deleted and fr.id = %s',
+                [data.fileRequestId]
+            )
+            call_for = c.fetchone()
+
+            if not call_for:
+                res.status_code = 400
+                return err('La solicitud de archivo (espacio para subir archivo) no existe')
+
+            c.execute(
+                'select id from applications where student_id = %s and call_for_id = %s and not deleted',
+                [verif['idRolePair']['id'], call_for[0]]
+            )
+            application = c.fetchone()
+
+            if not application:
+                res.status_code = 400
+                return err('No es miembro')
+
+            c.execute(
+                'select exists (select 1 from student_files where application_id = %s and file_request_id = %s)',
+                [application[0], data.fileRequestId]
+            )
+
+            file = StudentFile(
+                application[0],
+                data.fileRequestId,
+                data.name,
+                uri_validation[1]['media_type'],
+                uri_validation[1]['content'],
+                datetime.now(timezone.utc),
+                False
+            )
+
+            if c.fetchone()[0]:
+                c.execute(
+                    'update student_files set name = %s, media_type = %s, content = %s, modification = %s, deleted = %s where application_id = %s and file_request_id = %s',
+                    [file.name, file.media_type, file.content, file.modification, file.deleted, file.application_id, file.file_request_id]
+                )
+            else:
+                c.execute(
+                    'insert into student_files values (%s, %s, %s, %s, %s, %s, %s)',
+                    [file.application_id, file.file_request_id, file.name, file.media_type, file.content, file.modification, file.deleted]
+                )
+
+            conn.commit()
+
+            res.status_code = 200
+            return ok()
+    except Exception as e:
+        res.status_code = 500
+        return log_err(e)
+    finally:
+        if conn is not None:
+            conn.close()

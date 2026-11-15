@@ -3,6 +3,7 @@
 # TEST
 /api/student-files/read
 /api/student-files/read/{application_id},{file_req_id}
+/api/student-files/create
 
 /api/file-requests/create
 /api/file-requests/update
