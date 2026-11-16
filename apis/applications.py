@@ -68,7 +68,7 @@ def create(
             conn.close()
     
 class DeleteData(BaseModel):
-    call_for_id: int
+    callForId: int
 
 @app.delete('/api/applications/delete')
 def delete(
@@ -87,7 +87,7 @@ def delete(
         with conn.cursor() as c:
             c.execute(
                 'select exists (select 1 from calls_for cf join users u on cf.administrative_id = u.id where not cf.deleted and not u.deleted and cf.id = %s)',
-                [data.call_for_id]
+                [data.callForId]
             )
             if not c.fetchone()[0]:
                 res.status_code = 400
@@ -95,7 +95,7 @@ def delete(
 
             c.execute(
                 'select id from applications where student_id = %s and call_for_id = %s',
-                [verif['idRolePair']['id'], data.call_for_id]
+                [verif['idRolePair']['id'], data.callForId]
             )
             application = c.fetchone()
 

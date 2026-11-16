@@ -172,7 +172,7 @@ def read_by(
                             'applicationId', sf.application_id,
                             'fileRequestId', sf.file_request_id,
                             'name', sf.name,
-                            'size', length(sf.content),
+                            'size', sf.size,
                             'modification', sf.modification
                         )
                 end
@@ -191,7 +191,7 @@ def read_by(
                     conn,
                     f'select fr.id from file_requests fr { where }',
                     'fr.id',
-                    param_vals
+                    [call_for_id]
                 )
             else:
                 cursor_pos = cursor_pos_maybe
