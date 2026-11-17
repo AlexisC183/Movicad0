@@ -1,5 +1,5 @@
 # TODO
-See apis: student_files and file_requests, as the file_requests entity changed
+See apis: student_files, as the file_requests entity changed
 
 # TEST
 
