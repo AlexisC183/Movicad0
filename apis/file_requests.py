@@ -11,6 +11,8 @@ from models import FileRequest
 class CreateData(BaseModel):
     title: str
     callForId: int
+    referenceFileId: int | None
+    requirements: str
 
 @app.post('/api/file-requests/create')
 def create(
@@ -24,6 +26,7 @@ def create(
         return verif['body']
 
     trimmed_title = data.title.strip()
+    trimmed_requirements = data.requirements.strip()
 
     if not 1 <= len(trimmed_title) <= 150:
         res.status_code = 400
@@ -47,16 +50,34 @@ def create(
                 res.status_code = 400
                 return err('No es miembro')
 
+            c.execute(
+                """
+                select exists (
+                    select 1 from forum_files
+                    where %s is null or (
+                        not deleted and id = %s and call_for_id = %s
+                    )
+                )
+                """,
+                [data.referenceFileId, data.referenceFileId, data.callForId]
+            )
+
+            if not c.fetchone()[0]:
+                res.status_code = 400
+                return err('El archivo de referencia no existe en la convocatoria')
+
             file_req = FileRequest(
                 0,
                 trimmed_title,
                 data.callForId,
-                False
+                False,
+                data.referenceFileId,
+                trimmed_requirements
             )
 
             c.execute(
-                'insert into file_requests values (default, %s, %s, %s)',
-                [file_req.title, file_req.call_for_id, file_req.deleted]
+                'insert into file_requests values (default, %s, %s, %s, %s, %s)',
+                [file_req.title, file_req.call_for_id, file_req.deleted, file_req.ref_file_id, file_req.requirements]
             )
             conn.commit()
 

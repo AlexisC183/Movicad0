@@ -152,7 +152,9 @@ create table file_requests (
         check (length(title) > 0),
     call_for_id bigint not null
         references calls_for(id),
-    deleted boolean not null
+    deleted boolean not null,
+    ref_file_id bigint references forum_files(id),
+    requirements text not null collate case_accent_insensitive
 );
 
 create table applications (
