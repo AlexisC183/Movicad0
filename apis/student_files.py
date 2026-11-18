@@ -160,11 +160,17 @@ def read_by(
                 res.status_code = 403
                 return forbidden()
 
-            json_keys = ['fileRequestId', 'title', 'uploadedFile']
+            json_keys = ['fileRequestId', 'title', 'requirements', 'referenceFileId', 'uploadedFile']
             query = """
             select
                 fr.id,
                 fr.title,
+                fr.requirements,
+                case
+                    when ff.deleted is null or ff.deleted then
+                        null else
+                        ff.id
+                end,
                 case
                     when sf.application_id is null then
                         null else
@@ -182,6 +188,7 @@ def read_by(
                 from student_files
                 where not deleted and application_id = %s
             ) sf on fr.id = sf.file_request_id
+            left join forum_files ff on fr.ref_file_id = ff.id
             """
             where = 'where not fr.deleted and fr.call_for_id = %s'
             param_vals = [application[0], call_for_id]
