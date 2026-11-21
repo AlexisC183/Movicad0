@@ -3,7 +3,7 @@ from fastapi.responses import StreamingResponse
 from app import app
 from datetime import datetime, timezone
 from db import dbconn
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from utils import constants, sql
 from utils.res_bodies import ok, log_err, not_found, forbidden, err
 from utils.sessions import verify_requester
@@ -12,6 +12,11 @@ from typing import Annotated
 from models import StudentFile
 from io import BytesIO
 from ai import client
+from google.genai import types
+import json
+
+class MatchScore(BaseModel):
+    percentage: int = Field(ge=0, le=100)
 
 @app.get('/api/student-files/validate-pdf/{application_id},{file_req_id}')
 def validate_pdf(
@@ -89,25 +94,40 @@ def validate_pdf(
                 return err('Solo se pueden validar PDFs')
 
             c.execute(
-                'select sf.content, fr.title from student_files sf join file_requests fr on sf.file_request_id = fr.id where sf.application_id = %s and fr.id = %s',
+                'select sf.content, fr.title, fr.requirements from student_files sf join file_requests fr on sf.file_request_id = fr.id where sf.application_id = %s and fr.id = %s',
                 [application_id, file_req_id]
             )
-            [content, fr_title] = c.fetchone()
+            [content, fr_title, fr_requirements] = c.fetchone()
 
-            file = client.files.upload(
+            uploaded_file = client.files.upload(
                 file=BytesIO(content.tobytes()),
                 config={ 'mime_type': 'application/pdf' }
             )
-            response = client.models.generate_content(
-                model='gemini-3.5-flash-lite',
-                contents=[
-                    f'How much the file is a "{ fr_title }" (0-100%)',
-                    file
-                ]
-            )
-            
+
+            try:
+                response = client.models.generate_content(
+                    model='gemini-3.5-flash-lite',
+                    contents=[
+                        f'How valid (%) is PDF according to: requested file="{ fr_title }", more requirements="{ fr_requirements }"',
+                        uploaded_file
+                    ],
+                    config=types.GenerateContentConfig(
+                        system_instruction=(
+                            "You're a strict document validator. "
+                            "No greetings, no explanations, no extra things. "
+                            "Only return a percentage integer from 0 to 100."
+                        ),
+                        temperature=0.0,
+                        response_mime_type='application/json',
+                        response_schema=MatchScore
+                    )
+                )
+            finally:
+                if uploaded_file.name is not None:
+                    client.files.delete(name=uploaded_file.name)
+
             res.status_code = 200
-            return ok(response.text)
+            return ok(json.loads(response.text or ''))
     except Exception as e:
         res.status_code = 500
         return log_err(e)
