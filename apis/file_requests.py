@@ -11,6 +11,8 @@ from models import FileRequest
 class CreateData(BaseModel):
     title: str
     callForId: int
+    referenceFileId: int | None
+    requirements: str
 
 @app.post('/api/file-requests/create')
 def create(
@@ -24,6 +26,7 @@ def create(
         return verif['body']
 
     trimmed_title = data.title.strip()
+    trimmed_requirements = data.requirements.strip()
 
     if not 1 <= len(trimmed_title) <= 150:
         res.status_code = 400
@@ -47,16 +50,34 @@ def create(
                 res.status_code = 400
                 return err('No es miembro')
 
+            c.execute(
+                """
+                select exists (
+                    select 1 from forum_files
+                    where %s is null or (
+                        not deleted and id = %s and call_for_id = %s
+                    )
+                )
+                """,
+                [data.referenceFileId, data.referenceFileId, data.callForId]
+            )
+
+            if not c.fetchone()[0]:
+                res.status_code = 400
+                return err('El archivo de referencia no existe en la convocatoria')
+
             file_req = FileRequest(
                 0,
                 trimmed_title,
                 data.callForId,
-                False
+                False,
+                data.referenceFileId,
+                trimmed_requirements
             )
 
             c.execute(
-                'insert into file_requests values (default, %s, %s, %s)',
-                [file_req.title, file_req.call_for_id, file_req.deleted]
+                'insert into file_requests values (default, %s, %s, %s, %s, %s)',
+                [file_req.title, file_req.call_for_id, file_req.deleted, file_req.ref_file_id, file_req.requirements]
             )
             conn.commit()
 
@@ -72,6 +93,8 @@ def create(
 class UpdateData(BaseModel):
     id: int
     title: str
+    referenceFileId: int | None
+    requirements: str
 
 @app.patch('/api/file-requests/update')
 def update(
@@ -85,6 +108,7 @@ def update(
         return verif['body']
 
     trimmed_title = data.title.strip()
+    trimmed_requirements = data.requirements.strip()
 
     if not 1 <= len(trimmed_title) <= 150:
         res.status_code = 400
@@ -96,7 +120,7 @@ def update(
         with conn.cursor() as c:
             c.execute(
                 """
-                select cf.administrative_id from file_requests fr
+                select cf.administrative_id, cf.id from file_requests fr
                 join calls_for cf on fr.call_for_id = cf.id
                 join users a on cf.administrative_id = a.id
                 where not fr.deleted and not cf.deleted and not a.deleted and fr.id = %s
@@ -114,8 +138,29 @@ def update(
                 return err('No es miembro')
 
             c.execute(
-                'update file_requests set title = %s where id = %s',
-                [trimmed_title, data.id]
+                """
+                select exists (
+                    select 1 from forum_files
+                    where %s is null or (
+                        not deleted and id = %s and call_for_id = %s
+                    )
+                )
+                """,
+                [data.referenceFileId, data.referenceFileId, call_for[1]]
+            )
+
+            if not c.fetchone()[0]:
+                res.status_code = 400
+                return err('El archivo de referencia no existe en la convocatoria')
+
+            c.execute(
+                'update file_requests set title = %s, ref_file_id = %s, requirements = %s where id = %s',
+                [
+                    trimmed_title,
+                    data.referenceFileId,
+                    trimmed_requirements,
+                    data.id
+                ]
             )
             conn.commit()
 

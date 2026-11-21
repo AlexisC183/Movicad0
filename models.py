@@ -125,6 +125,8 @@ class FileRequest:
     title: str
     call_for_id: int
     deleted: bool
+    ref_file_id: int | None
+    requirements: str
 
 
 @dataclass
